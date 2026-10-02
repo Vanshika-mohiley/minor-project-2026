@@ -25,6 +25,7 @@ SAFE_PHRASES = [
     "no material weakness",
     "not identified any material weakness",
     "no fraud",
+    "if we conclude that a material uncertainty exists",
 ]
 
 
