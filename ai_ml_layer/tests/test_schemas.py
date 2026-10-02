@@ -1,7 +1,8 @@
 from analysis.schemas import AnalysisReport, Metrics
 
 report = AnalysisReport(
+    doc_id="demo",
     summary="This is a test summary",
-    metrics=Metrics(revenue=1200.5, net_income=88.2),
+    metrics=Metrics(income_growth_pct=9.9),
 )
 print(report)

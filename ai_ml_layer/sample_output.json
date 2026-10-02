@@ -1,0 +1,53 @@
+{
+  "doc_id": "sample_report.pdf",
+  "summary": "(AI summary comes in the next step)",
+  "metrics": {
+    "basis": "Standalone",
+    "unit": "INR crore",
+    "total_income": {
+      "this_year": 155310.0,
+      "last_year": 141374.0,
+      "page": 33
+    },
+    "profit": {
+      "this_year": 29211.0,
+      "last_year": 25568.0,
+      "page": 34
+    },
+    "total_assets": {
+      "this_year": 126691.0,
+      "last_year": 124936.0,
+      "page": 34
+    },
+    "total_equity": {
+      "this_year": 80874.0,
+      "last_year": 87332.0,
+      "page": 34
+    },
+    "income_growth_pct": 9.9,
+    "profit_growth_pct": 14.2,
+    "profit_margin_pct": 18.8,
+    "equity_to_assets_pct": 63.8
+  },
+  "risk_flags": [
+    {
+      "type": "litigation",
+      "severity": "medium",
+      "page": 122,
+      "evidence": "Infosys Integrated Annual Report 2025-26 153 Company shares-related disputes / litigation There are certain pending civil cases involving rival claims made by parties seeking declaration of title and accrued benefits of the Company’s disputed shares. Since the disputed shares"
+    },
+    {
+      "type": "litigation",
+      "severity": "medium",
+      "page": 147,
+      "evidence": "putation and cost of compliance due to investigations, regulatory inquiries, litigation, fines, etc."
+    },
+    {
+      "type": "penalty",
+      "severity": "medium",
+      "page": 152,
+      "evidence": "l trust audit for the years 2017 to 2024 No 1 Federal Tax Authority 0.12 crore Penalty on account of failure to pay VAT liability for Q1FY26 No"
+    }
+  ],
+  "risk_score": 30
+}
