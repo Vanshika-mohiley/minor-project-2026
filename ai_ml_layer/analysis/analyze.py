@@ -2,6 +2,7 @@ from analysis.pdf_reader import read_pdf
 from analysis.metrics import extract_metrics, change_percent
 from analysis.pipeline import confirm_risks, risk_score
 from analysis.schemas import AnalysisReport, Metrics, MetricValue, RiskFlag
+from analysis.summarize import safe_summary
 
 
 def to_value(d):
@@ -11,6 +12,7 @@ def to_value(d):
 
 
 def analyze(pdf_path, basis="Standalone"):
+    """Read a report PDF and return a full AnalysisReport: metrics, risk flags, score and summary."""
     pages = read_pdf(pdf_path)
     raw = extract_metrics(pages)
 
@@ -44,10 +46,14 @@ def analyze(pdf_path, basis="Standalone"):
             evidence=f["evidence"][:300],
         ))
 
-    return AnalysisReport(
+    report = AnalysisReport(
         doc_id=pdf_path.split("/")[-1],
-        summary="(AI summary comes in the next step)",
+        summary="",
         metrics=metrics,
         risk_flags=flags,
         risk_score=risk_score(confirmed),
     )
+
+    text, used_ai, extra = safe_summary(report)
+    report.summary = text
+    return report
