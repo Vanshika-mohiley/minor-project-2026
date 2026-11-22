@@ -1,24 +1,47 @@
 from analysis.risk import find_risks
-from analysis.judge import judge_snippet
+from analysis.judge import judge_snippet, judge_snippets_batch
 
 POINTS = {"high": 25, "medium": 10}
+
 
 def confirm_risks(pages):
     candidates = [
         item for item in find_risks(pages)
         if item.get("severity") in POINTS
     ]
-    confirmed = []
+    if not candidates:
+        return [], []
+
+    # Deduplicate identical evidence strings before sending to LLM
+    seen = set()
+    unique_candidates = []
     for item in candidates:
-        try:
-            judgement = judge_snippet(item.get("evidence", ""))
+        ev = item.get("evidence", "").strip()
+        if ev not in seen:
+            seen.add(ev)
+            unique_candidates.append(item)
+
+    # Cap at top 15 candidates for fast single-pass latency
+    batch_items = unique_candidates[:15]
+    confirmed = []
+
+    try:
+        judgements = judge_snippets_batch([i.get("evidence", "") for i in batch_items])
+        for item, judgement in zip(batch_items, judgements):
             if judgement.get("real_risk") is not False:
                 confirmed.append(item)
-        except Exception:
-            # Keep the rule-based candidate for human review if the local
-            # judge model is unavailable or returns an unexpected response.
-            confirmed.append(item)
+    except Exception:
+        # Fallback: evaluate individually or keep rule-based candidates if offline
+        for item in batch_items:
+            try:
+                judgement = judge_snippet(item.get("evidence", ""))
+                if judgement.get("real_risk") is not False:
+                    confirmed.append(item)
+            except Exception:
+                confirmed.append(item)
+
     return candidates, confirmed
+
 
 def risk_score(confirmed):
     counts = {}
