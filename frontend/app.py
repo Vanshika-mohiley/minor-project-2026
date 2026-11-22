@@ -14,6 +14,13 @@ CACHE_DIR = os.path.join(ML_DIR, "cache")
 SAMPLE_PATH = os.path.join(ML_DIR, "sample_output.json")
 sys.path.insert(0, ML_DIR)
 
+# Safely load server API key from Streamlit Cloud Secrets if available
+try:
+    if "GROQ_API_KEY" in st.secrets:
+        os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
+except Exception:
+    pass
+
 st.set_page_config(
     page_title="FinSight AI | Document Intelligence & Risk Screener",
     page_icon="🏦",
@@ -200,7 +207,7 @@ def get_report(file_bytes, file_name, basis):
     with st.status("Running Multi-Stage Financial Intelligence Pipeline...", expanded=True) as status:
         st.write("📄 Extracting text & financial tables via PyMuPDF...")
         st.write("🧮 Computing YoY ratios & balance sheet metrics...")
-        st.write("🛡️ Screening legal disclosures via Llama-3.2 Judge...")
+        st.write("🛡️ Screening legal disclosures via Batched AI Risk Judge...")
         report = run_analysis(pdf_path, basis)
         status.update(label="Analysis Complete!", state="complete", expanded=False)
 
@@ -324,7 +331,7 @@ with st.sidebar:
     st.info(
         "**1. Parser:** PyMuPDF Keyword-Filtered Tables\n\n"
         "**2. Quant Engine:** Deterministic Python Ratios\n\n"
-        "**3. AI Judge:** Local Llama-3.2 (3B) via Ollama\n\n"
+        "**3. AI Judge:** Cloud Batched Llama-3.1 Engine\n\n"
         "**4. Cache:** MD5 Hash Instant Reload"
     )
 
@@ -337,9 +344,7 @@ if uploaded_file is not None:
         else:
             st.toast("Full AI analysis completed!", icon="✅")
     except Exception as error:
-        st.error(
-            f"Analysis failed: {error}. Ensure Ollama is running (`ollama serve`) with `llama3.2:3b` installed."
-        )
+        st.error(f"Analysis failed: {error}. Please check your PDF file or server API configuration.")
 elif os.path.exists(SAMPLE_PATH):
     with open(SAMPLE_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -357,7 +362,7 @@ if data:
     st.markdown("### 📌 AI Executive Narrative")
     summary_text = data.get("summary") or ""
     if not summary_text or "(AI summary comes in the next step)" in summary_text:
-        st.warning("AI Executive Summary pending. Run analysis with Ollama active to populate.")
+        st.warning("AI Executive Summary pending. Upload a filing with the server API configured to generate.")
     else:
         st.markdown(f"<div class='summary-card'>{html.escape(summary_text)}</div>", unsafe_allow_html=True)
 
