@@ -1,6 +1,5 @@
 import re
-import ollama
-from analysis.judge import MODEL
+from analysis.judge import _call_llm
 
 PROMPT = """You are a financial analyst writing a short executive summary for a reader who is not an expert.
 Use ONLY the facts below. Copy every number exactly as written. Do not add any number or fact that is not listed. Do not give investment advice.
@@ -10,8 +9,10 @@ Write one short paragraph of 4 to 6 simple sentences in plain English.
 State the selected basis, cover income and profit growth, profit margin, equity-to-assets ratio, and risk screening.
 Say flagged items need human review. End with the risk score out of 100 and say it is only a rough indicator."""
 
+
 def fmt(value):
     return str(int(value)) if value == int(value) else str(value)
+
 
 def build_facts(report):
     m = report.metrics
@@ -34,8 +35,10 @@ def build_facts(report):
     lines.append(f"Risk score: {report.risk_score} out of 100")
     return "\n".join(lines)
 
+
 def numbers_in(text):
-    return set(re.findall(r"\\d+(?:\\.\\d+)?", str(text).replace(",", "")))
+    return set(re.findall(r"\d+(?:\.\d+)?", str(text).replace(",", "")))
+
 
 def fallback_summary(report):
     m = report.metrics
@@ -58,20 +61,18 @@ def fallback_summary(report):
     parts.append(f"The risk score is {report.risk_score} out of 100 and is only a rough indicator.")
     return " ".join(parts)
 
+
 def safe_summary(report):
     facts = build_facts(report)
     try:
-        response = ollama.chat(
-            model=MODEL,
-            messages=[{"role": "user", "content": PROMPT.format(facts=facts)}],
-            options={"temperature": 0, "num_predict": 300},
-        )
-        summary = clean_summary(response["message"]["content"])
+        raw_text = _call_llm(PROMPT.format(facts=facts), json_mode=False, max_tokens=300)
+        summary = clean_summary(raw_text)
         if numbers_in(summary) - numbers_in(facts):
             return fallback_summary(report), False, ["unexpected numbers"]
         return summary, True, []
     except Exception as error:
         return fallback_summary(report), False, [str(error)]
+
 
 def clean_summary(text):
     lines = [line.strip() for line in str(text).strip().splitlines() if line.strip()]
