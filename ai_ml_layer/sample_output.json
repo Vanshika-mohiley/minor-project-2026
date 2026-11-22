@@ -1,6 +1,6 @@
 {
   "doc_id": "sample_report.pdf",
-  "summary": "The company's standalone financials for this year show a total income of 155310 crore, a 9.9% increase from last year's 141374 crore. The profit for this year is 29211 crore, a 14.2% increase from last year's 25568 crore, with a profit margin of 18.8%. The equity to assets ratio is 63.8%. However, the risk screening identified 3 flagged risk items, including litigation on page 122, litigation on page 147, and a penalty on page 152, which still require human review. These flagged items are still under review and do not necessarily reflect the company's overall financial health. The risk score is 30 out of 100, which is only a rough indicator of the company's risk profile.",
+  "summary": "The company's standalone financials for this year show a total income of 155310 crore, a 9.9% increase from last year's 141374 crore. The profit for this year is 29211 crore, a 14.2% increase from last year's 25568 crore, with a profit margin of 18.8%. The equity to assets ratio is 63.8%. However, the risk screening identified 3 flagged risk items, including litigation on page 122, litigation on page 147, and a penalty on page 152, which still require human review. These flagged items are just one aspect of the company's overall risk profile, and the risk score of 30 out of 100 is only a rough indicator.",
   "metrics": {
     "basis": "Standalone",
     "unit": "INR crore",
