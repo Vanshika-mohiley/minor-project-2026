@@ -2,7 +2,7 @@
 
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://minor-project-2026-cwh7njkikl8oxhg2qqvnj7.streamlit.app/)
 
-**Live demo:** https://YOUR-APP-NAME.streamlit.app
+**Live demo:**[ https://minor-project-2026.streamlit.app](https://minor-project-2026-cwh7njkikl8oxhg2qqvnj7.streamlit.app/)
 
 FinLens reads a long annual report (PDF) and gives you the key financial figures, risk warnings with page numbers, a 0–100 risk score and a plain-English summary, so a human reviewer knows where to look first.
 
