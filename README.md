@@ -1,6 +1,6 @@
 # FinLens: Financial Document Intelligence & Risk Screener
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://YOUR-APP-NAME.streamlit.app)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://minor-project-2026-cwh7njkikl8oxhg2qqvnj7.streamlit.app/)
 
 **Live demo:** https://YOUR-APP-NAME.streamlit.app
 
