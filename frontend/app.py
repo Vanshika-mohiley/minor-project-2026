@@ -1,170 +1,551 @@
-import hashlib, json, os, sys, tempfile
-from pathlib import Path
-import streamlit as st
+import hashlib
+import html
+import json
+import os
+import sys
+import tempfile
+
 import plotly.graph_objects as go
+import streamlit as st
 
-ROOT=Path(__file__).resolve().parents[1]
-ML=ROOT/"ai_ml_layer"
-CACHE=ML/"cache"
-sys.path.insert(0,str(ML))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ML_DIR = os.path.join(ROOT, "ai_ml_layer")
+CACHE_DIR = os.path.join(ML_DIR, "cache")
+SAMPLE_PATH = os.path.join(ML_DIR, "sample_output.json")
+sys.path.insert(0, ML_DIR)
 
-st.set_page_config(page_title="FinSight AI | Corporate Filing Intelligence",page_icon="📊",layout="wide",initial_sidebar_state="expanded")
+# Safely load server API key from Streamlit Cloud Secrets if available
+try:
+    if "GROQ_API_KEY" in st.secrets:
+        os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
+except Exception:
+    pass
+
+st.set_page_config(
+    page_title="FinSight AI | Document Intelligence & Risk Screener",
+    page_icon="🏦",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# Premium Executive Styling
 st.markdown("""
-<style>
-:root{color-scheme:dark}
-.stApp{background:#171717;color:#f4f6fb}
-section[data-testid="stSidebar"]{background:#202020;border-right:1px solid #353535}
-.block-container{padding-top:2rem;max-width:1500px}
-.hero{background:linear-gradient(115deg,#202b40,#174b79);border:1px solid #285d91;border-radius:16px;padding:30px 32px;margin-bottom:18px}
-.eyebrow{display:inline-block;color:#4fc3ff;border:1px solid #176b9c;background:#14364d;padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.4px}
-.hero h1{font-size:30px;margin:18px 0 8px;color:white}.hero p{color:#a9c3e6;margin:0}
-.metric-card{background:#242b35;border:1px solid #3a4656;border-radius:12px;padding:18px 20px;min-height:122px}
-.metric-label{font-size:11px;color:#a8bad0;text-transform:uppercase;letter-spacing:.8px}.metric-value{font-size:27px;font-weight:750;color:#fff;margin:7px 0}.metric-foot{font-size:11px;color:#9bb0c8}
-.section-title{font-size:22px;font-weight:700;margin:24px 0 12px}
-.summary{background:#f5f7fb;color:#142033;border-left:5px solid #2d73f5;border-radius:10px;padding:18px 22px;line-height:1.65}
-.smallmuted{color:#a9b5c7;font-size:12px}
-div[data-testid="stTabs"] button{color:#c7d2e2}
-</style>
-""",unsafe_allow_html=True)
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* Hero Banner */
+    .hero-banner {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f4c81 100%);
+        padding: 28px 32px;
+        border-radius: 16px;
+        color: #ffffff;
+        margin-bottom: 24px;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .hero-title {
+        font-size: 1.85rem;
+        font-weight: 700;
+        margin: 0;
+        letter-spacing: -0.02em;
+    }
+    .hero-subtitle {
+        color: #94a3b8;
+        font-size: 0.95rem;
+        margin-top: 6px;
+        margin-bottom: 0;
+    }
+    .hero-pill {
+        display: inline-block;
+        background: rgba(56, 189, 248, 0.15);
+        color: #38bdf8;
+        border: 1px solid rgba(56, 189, 248, 0.3);
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+
+    /* Executive Summary Card */
+    .summary-card {
+        background: linear-gradient(to right, #f8fafc, #ffffff);
+        border: 1px solid #e2e8f0;
+        border-left: 5px solid #2563eb;
+        border-radius: 12px;
+        padding: 20px 24px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        color: #1e293b;
+        line-height: 1.65;
+        font-size: 0.96rem;
+    }
+
+    /* Custom KPI Card */
+    .kpi-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 18px 20px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .kpi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(37, 99, 235, 0.08);
+        border-color: #bfdbfe;
+    }
+    .kpi-label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #64748b;
+        margin-bottom: 6px;
+    }
+    .kpi-value {
+        font-size: 1.65rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 6px;
+    }
+    .kpi-delta-pos {
+        display: inline-block;
+        background: #dcfce7;
+        color: #166534;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.78rem;
+        font-weight: 600;
+    }
+    .kpi-delta-neg {
+        display: inline-block;
+        background: #fee2e2;
+        color: #991b1b;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.78rem;
+        font-weight: 600;
+    }
+    .kpi-delta-neutral {
+        display: inline-block;
+        background: #f1f5f9;
+        color: #475569;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.78rem;
+        font-weight: 600;
+    }
+    .kpi-source {
+        font-size: 0.75rem;
+        color: #94a3b8;
+        margin-top: 8px;
+    }
+
+    /* Evidence Box */
+    .evidence-box {
+        background-color: #0f172a;
+        color: #e2e8f0;
+        border-left: 4px solid #f43f5e;
+        border-radius: 8px;
+        padding: 14px 16px;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 0.86em;
+        line-height: 1.55;
+        margin-top: 8px;
+    }
+
+    /* Badges */
+    .badge-high {
+        background-color: #fee2e2;
+        color: #991b1b;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.76em;
+        font-weight: 700;
+    }
+    .badge-medium {
+        background-color: #fef3c7;
+        color: #92400e;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.76em;
+        font-weight: 700;
+    }
+    .badge-type {
+        background-color: #e0e7ff;
+        color: #1e40af;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.76em;
+        font-weight: 700;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+
+def run_analysis(pdf_path, basis):
+    from analysis.analyze import analyze
+    return analyze(pdf_path, basis=basis)
+
+
+def get_report(file_bytes, file_name, basis):
+    key = hashlib.md5(file_bytes).hexdigest() + "_" + basis
+    cache_file = os.path.join(CACHE_DIR, key + ".json")
+    if os.path.exists(cache_file):
+        with open(cache_file, "r", encoding="utf-8") as f:
+            return json.load(f), True
+
+    folder = tempfile.mkdtemp()
+    pdf_path = os.path.join(folder, os.path.basename(file_name))
+    with open(pdf_path, "wb") as f:
+        f.write(file_bytes)
+
+    with st.status("Running Multi-Stage Financial Intelligence Pipeline...", expanded=True) as status:
+        st.write("📄 Extracting text & financial tables via PyMuPDF...")
+        st.write("🧮 Computing YoY ratios & balance sheet metrics...")
+        st.write("🛡️ Screening legal disclosures via Batched AI Risk Judge...")
+        report = run_analysis(pdf_path, basis)
+        status.update(label="Analysis Complete!", state="complete", expanded=False)
+
+    result = report.model_dump()
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    with open(cache_file, "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False)
+    return result, False
+
+
+def money(value):
+    if value is None:
+        return "N/A"
+    return f"₹{value:,.0f} Cr"
+
+
+def ratio(top, bottom):
+    if top is None or not bottom:
+        return None
+    return top / bottom * 100
+
+
+def difference(now, before):
+    if now is None or before is None:
+        return None
+    return now - before
+
+
+def render_kpi_card(label, value_str, delta_val, delta_suffix, source_str):
+    if delta_val is None:
+        delta_html = "<span class='kpi-delta-neutral'>Baseline Metric</span>"
+    elif delta_val > 0:
+        delta_html = f"<span class='kpi-delta-pos'>▲ +{delta_val:.1f}{delta_suffix}</span>"
+    elif delta_val < 0:
+        delta_html = f"<span class='kpi-delta-neg'>▼ {delta_val:.1f}{delta_suffix}</span>"
+    else:
+        delta_html = f"<span class='kpi-delta-neutral'>0.0{delta_suffix}</span>"
+
+    st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-label">{label}</div>
+            <div class="kpi-value">{value_str}</div>
+            <div>{delta_html}</div>
+            <div class="kpi-source">{source_str}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+
+def answer_question_from_report(query, data):
+    """Grounded Q&A engine answering directly from extracted report data + citations."""
+    q = query.lower()
+    metrics = data.get("metrics") or {}
+    flags = data.get("risk_flags") or []
+
+    if any(w in q for w in ["income", "revenue", "sales", "top line"]):
+        inc = metrics.get("total_income") or {}
+        return (
+            f"**Total Income ({metrics.get('basis', 'Reported')}):** {money(inc.get('this_year'))} "
+            f"(vs {money(inc.get('last_year'))} last year), representing **{metrics.get('income_growth_pct', 'N/A')}% YoY growth**.\n\n"
+            f"📍 *Citation: Page {inc.get('page', 'N/A')}*"
+        )
+
+    if any(w in q for w in ["profit", "margin", "net income", "bottom line"]):
+        prof = metrics.get("profit") or {}
+        return (
+            f"**Net Profit:** {money(prof.get('this_year'))} (vs {money(prof.get('last_year'))} last year), "
+            f"growing at **{metrics.get('profit_growth_pct', 'N/A')}% YoY** with a **Net Profit Margin of {metrics.get('profit_margin_pct', 'N/A')}%**.\n\n"
+            f"📍 *Citation: Page {prof.get('page', 'N/A')}*"
+        )
+
+    if any(w in q for w in ["asset", "equity", "balance sheet", "solvency"]):
+        assets = metrics.get("total_assets") or {}
+        equity = metrics.get("total_equity") or {}
+        return (
+            f"**Balance Sheet Health:** Total Assets stand at **{money(assets.get('this_year'))}** (Page {assets.get('page', 'N/A')}) "
+            f"and Total Equity is **{money(equity.get('this_year'))}** (Page {equity.get('page', 'N/A')}). "
+            f"The **Equity-to-Assets ratio is {metrics.get('equity_to_assets_pct', 'N/A')}%**."
+        )
+
+    if any(w in q for w in ["risk", "penalty", "litigation", "tax", "court", "flag", "audit"]):
+        if not flags:
+            return "✅ No severe audit or litigation risk flags were detected in this report."
+        lines = [f"**Audit Risk Score: {data.get('risk_score', 0)}/100** ({len(flags)} confirmed disclosures):\n"]
+        for i, f in enumerate(flags, 1):
+            lines.append(f"{i}. **[{f.get('type', '').upper()} - {f.get('severity', '').upper()}]** (Page {f.get('page')}): *\"{f.get('evidence', '')[:180]}...\"*")
+        return "\n".join(lines)
+
+    if any(w in q for w in ["summary", "overview", "brief", "highlights"]):
+        return f"**Executive Summary:**\n\n{data.get('summary', 'No summary available.')}"
+
+    return (
+        f"Based on **{data.get('doc_id')}**, here are the verified figures:\n"
+        f"- **Total Income:** {money((metrics.get('total_income') or {}).get('this_year'))} (Page {(metrics.get('total_income') or {}).get('page', 'N/A')})\n"
+        f"- **Net Profit:** {money((metrics.get('profit') or {}).get('this_year'))} (Page {(metrics.get('profit') or {}).get('page', 'N/A')})\n"
+        f"- **Audit Risk Score:** {data.get('risk_score', 0)}/100 across {len(flags)} flagged disclosures.\n\n"
+        f"💡 *Tip: Ask specifically about revenue, profit margins, balance sheet equity, or tax/litigation risks.*"
+    )
+
+
+# Hero Banner
+st.markdown("""
+    <div class="hero-banner">
+        <div class="hero-pill">INSTITUTIONAL FINANCIAL NLP & RISK ENGINE</div>
+        <h1 class="hero-title">FinSight AI — Corporate Filing Intelligence</h1>
+        <p class="hero-subtitle">Automated Financial Ratio Modeling, Layout-Aware Table Extraction & LLM Risk Auditing with Page Citations</p>
+    </div>
+""", unsafe_allow_html=True)
+
+# Sidebar
 with st.sidebar:
     st.markdown("## 📂 Filing Ingestion")
-    uploaded=st.file_uploader("Upload Corporate Annual Report (PDF)",type=["pdf"],help="PDF only · maximum 200 MB")
-    basis=st.selectbox("Statement Basis",["Choose basis…","Standalone","Consolidated"],index=0)
+    uploaded_file = st.file_uploader("Upload Corporate Annual Report (PDF)", type=["pdf"])
+    basis = st.selectbox(
+        "Statement Basis",
+        ["Consolidated", "Standalone"],
+        help="Select whether to extract Consolidated or Standalone financial statement tables.",
+    )
+
     st.divider()
     st.markdown("### ⚙️ Architecture Stack")
-    st.markdown("**1. Document Reader**  \nPyMuPDF text extraction + OCR fallback")
-    st.markdown("**2. Financial Engine**  \nDeterministic Python calculations")
-    st.markdown("**3. Risk Screening**  \nEvidence-backed keyword triage")
-    st.markdown("**4. Retrieval**  \nPage-grounded filing Q&A")
-    st.divider()
-    st.caption("No sample figures are loaded. Results appear only after a report is uploaded and analysed.")
+    st.info(
+        "**1. Parser:** PyMuPDF Keyword-Filtered Tables\n\n"
+        "**2. Quant Engine:** Deterministic Python Ratios\n\n"
+        "**3. AI Judge:** Cloud Batched Llama-3.1 Engine\n\n"
+        "**4. Cache:** MD5 Hash Instant Reload"
+    )
 
-st.markdown('<div class="hero"><span class="eyebrow">INSTITUTIONAL FINANCIAL NLP & RISK ENGINE</span><h1>FinSight AI — Corporate Filing Intelligence</h1><p>Automated financial ratio modelling, layout-aware statement extraction and explainable risk screening with page citations</p></div>',unsafe_allow_html=True)
-
-if not uploaded:
-    st.markdown("### Welcome to FinSight AI")
-    st.info("Upload a company's annual report from the left panel and select Standalone or Consolidated statements to begin. No demo or placeholder numbers are displayed.")
-    c1,c2,c3=st.columns(3)
-    for col,head,body in [(c1,"📄 Document ingestion","Extracts selectable PDF text and uses OCR only for scanned pages."),(c2,"📊 Financial analytics","Calculates income growth, profit growth, margins and capital structure from identified statements."),(c3,"🔎 Explainable screening","Shows risk-related passages with source page references for human review.")]:
-        with col: st.markdown(f"<div class='metric-card'><b>{head}</b><p class='smallmuted'>{body}</p></div>",unsafe_allow_html=True)
-    st.stop()
-
-if basis=="Choose basis…":
-    st.warning("Please select whether you want Standalone or Consolidated figures.")
-    st.stop()
-
-@st.cache_data(show_spinner=False,max_entries=12)
-def analyse_bytes(data,name,selected_basis):
-    from analysis.analyze import analyze
-    with tempfile.NamedTemporaryFile(suffix=".pdf",delete=False) as f:
-        f.write(data); path=f.name
-    try: return analyze(path,basis=selected_basis).model_dump()
-    finally: os.unlink(path)
-
-file_bytes=uploaded.getvalue()
-if len(file_bytes)>200*1024*1024:
-    st.error("This PDF exceeds the 200 MB upload limit."); st.stop()
-try:
-    with st.spinner("Reading PDF pages, locating the selected financial statements and validating extracted figures…"):
-        data=analyse_bytes(file_bytes,uploaded.name,basis)
-except Exception as e:
-    st.error(f"Analysis could not be completed: {e}")
-    st.caption("Try an unlocked PDF with selectable text. Scanned PDFs require Tesseract OCR to be installed on the server.")
-    st.stop()
-
-m=data.get("metrics",{})
-actual_basis=(m.get("basis") or basis)
-st.success(f"Analysis completed · {uploaded.name} · {actual_basis} basis")
-meta=data.get("metadata",{})
-unit=m.get("unit","Unit not identified")
-st.caption(f"Active filing: **{uploaded.name}**  ·  Basis: **{actual_basis}**  ·  Company: **{meta.get('company','Unidentified')}**  ·  Period: **{meta.get('period','Unidentified')}**  ·  Units: **{unit}**")
-for warning in data.get("extraction_warnings",[]): st.warning(warning)
-
-def val(k):
-    d=m.get(k) or {}; return d.get("this_year"),d.get("last_year"),d.get("page")
-def money(x): return "Not found" if x is None else f"{x:,.2f}"
-def growth(x): return "Not available" if x is None else f"{x:+.1f}% YoY"
-def card(label,value,foot):
-    st.markdown(f"<div class='metric-card'><div class='metric-label'>{label}</div><div class='metric-value'>{value}</div><div class='metric-foot'>{foot}</div></div>",unsafe_allow_html=True)
-
-st.markdown("<div class='section-title'>📌 Executive Narrative</div>",unsafe_allow_html=True)
-st.markdown(f"<div class='summary'>{data.get('summary') or 'A narrative could not be generated from the extracted figures. Review the source statements below.'}</div>",unsafe_allow_html=True)
-
-inc,inc0,ip=val("total_income"); prof,prof0,pp=val("profit"); assets,assets0,ap=val("total_assets"); equity,equity0,ep=val("total_equity")
-cols=st.columns(4)
-items=[("TOTAL INCOME",money(inc),f"{growth(m.get('income_growth_pct'))} · Page {ip or '—'}"),("NET PROFIT",money(prof),f"{growth(m.get('profit_growth_pct'))} · Page {pp or '—'}"),("NET PROFIT MARGIN",("Not available" if m.get('profit_margin_pct') is None else f"{m['profit_margin_pct']:.1f}%"),"Net profit ÷ total income"),("EQUITY / ASSETS",("Not available" if m.get('equity_to_assets_pct') is None else f"{m['equity_to_assets_pct']:.1f}%"),f"Page {ep or '—'} / {ap or '—'}")]
-for c,(a,b,d) in zip(cols,items):
-    with c: card(a,b,d)
-
-st.markdown("<div class='section-title'>📈 Financial & Risk Analytics</div>",unsafe_allow_html=True)
-tab1,tab2,tab3=st.tabs(["📊 Financial Analytics","⚠️ Audit & Risk Flags","💬 Ask the Filing"])
-with tab1:
-    left,right=st.columns([1.35,1])
-    with left:
-        labels=[]; prior=[]; current=[]
-        for label,a,b in [("Total Income",inc0,inc),("Net Profit",prof0,prof),("Total Assets",assets0,assets),("Total Equity",equity0,equity)]:
-            if a is not None and b is not None: labels.append(label);prior.append(a);current.append(b)
-        if labels:
-            fig=go.Figure([go.Bar(name="Previous year",x=labels,y=prior,marker_color="#92a8c5"),go.Bar(name="Current year",x=labels,y=current,marker_color="#2f73ed")])
-            fig.update_layout(title=f"Comparative amounts ({unit})",barmode="group",height=360,paper_bgcolor="#171717",plot_bgcolor="#171717",font_color="#e7edf7",margin=dict(l=10,r=10,t=45,b=20),legend=dict(orientation="h",y=1.12))
-            st.plotly_chart(fig,use_container_width=True)
-        else: st.warning("No comparable year-on-year figures were extracted.")
-    with right:
-        if equity is not None and assets and 0 <= equity <= assets:
-            fig=go.Figure(go.Pie(labels=["Total Equity","Total Liabilities"],values=[equity,assets-equity],hole=.55,marker_colors=["#18a9e8","#c7d4e4"],textinfo="percent"))
-            fig.update_layout(title="Capital Structure Split",height=360,paper_bgcolor="#171717",font_color="#e7edf7",margin=dict(l=5,r=5,t=40,b=5),showlegend=True)
-            st.plotly_chart(fig,use_container_width=True)
-        elif equity is not None and assets:
-            st.warning("Capital structure chart hidden because extracted equity does not reconcile within total assets. Review the figures and source pages.")
-        else: st.info("Capital structure chart requires both total equity and total assets.")
-    st.markdown("#### Extracted figures & source pages")
-    rows=[]
-    for label,k in [("Total Income","total_income"),("Net Profit","profit"),("Total Assets","total_assets"),("Total Equity","total_equity")]:
-        d=m.get(k) or {}; rows.append({"Metric":label,f"Current year ({unit})":d.get("this_year"),f"Previous year ({unit})":d.get("last_year"),"PDF page":d.get("page"),"Extracted label":d.get("label"),"Confidence":d.get("confidence")})
-    st.dataframe(rows,use_container_width=True,hide_index=True)
-    st.caption("Ratios are computed from extracted statement values. Missing values are left blank rather than guessed.")
-with tab2:
-    flags=data.get("risk_flags") or []
-    score=max(0,min(100,int(data.get("risk_score") or 0)))
-    gauge_col, detail_col = st.columns([1, 1.6])
-    with gauge_col:
-        gauge = go.Figure(go.Indicator(
-            mode="gauge+number", value=score,
-            title={"text": "Disclosure Signal Index (0–100)"},
-            gauge={
-                "axis": {"range": [0, 100]},
-                "bar": {"color": "#4aa3ff"},
-                "steps": [
-                    {"range": [0, 20], "color": "#1f6b4b"},
-                    {"range": [20, 50], "color": "#8b792a"},
-                    {"range": [50, 75], "color": "#9a5728"},
-                    {"range": [75, 100], "color": "#8d3434"},
-                ],
-            },
-        ))
-        gauge.update_layout(height=280, paper_bgcolor="#171717", font_color="#e7edf7", margin=dict(l=24,r=24,t=55,b=10))
-        st.plotly_chart(gauge, use_container_width=True)
-        st.caption(f"{data.get('risk_score_label','Disclosure signal index (0–100)')}. Rule-based indicator, not a probability, credit rating or investment recommendation. Repeated passages in one category count once.")
-    with detail_col:
-        st.warning("Every highlighted passage needs human review. A zero score means this rule set did not identify a qualifying passage; it does not mean the company has no risk.")
-        if not flags:
-            st.success("No qualifying adverse-disclosure patterns were identified by the current screening rules.")
+data = None
+if uploaded_file is not None:
+    try:
+        data, from_cache = get_report(uploaded_file.getvalue(), uploaded_file.name, basis)
+        if from_cache:
+            st.toast("Loaded instantly from MD5 cache!", icon="⚡")
         else:
-            st.write(f"{len(flags)} potentially relevant passage(s) identified")
-            for i,f in enumerate(flags,1):
-                with st.expander(f"{i}. {f.get('type','Risk item').title()} · {f.get('severity','review').title()} · PDF page {f.get('page','—')}"):
-                    st.write(f.get("evidence",""))
-with tab3:
-    q=st.text_input("Ask a question about this filing",placeholder="e.g. What was consolidated total income in FY 2024-25?")
-    if st.button("Find answer",disabled=not q.strip()):
-        from analysis.pdf_reader import read_pdf
-        from analysis.qa import answer_question
-        with tempfile.NamedTemporaryFile(suffix=".pdf",delete=False) as f: f.write(file_bytes); path=f.name
-        try:
-            with st.spinner("Searching relevant report pages…"): ans=answer_question(read_pdf(path,ocr=False),q)
-            st.write(ans["answer"])
-        finally: os.unlink(path)
+            st.toast("Full AI analysis completed!", icon="✅")
+    except Exception as error:
+        st.error(f"Analysis failed: {error}. Please check your PDF file or server API configuration.")
+elif os.path.exists(SAMPLE_PATH):
+    with open(SAMPLE_PATH, "r", encoding="utf-8") as f:
+        data = json.load(f)
 
-st.divider()
-st.caption("FinSight AI is an academic decision-support prototype. Verify extracted figures against the audited annual report before relying on them.")
+if data:
+    doc_name = data.get("doc_id", "Financial Report")
+    metrics = data.get("metrics") or {}
+    unit = metrics.get("unit", "INR crore")
+    basis_label = metrics.get("basis", "Unspecified")
+
+    # Document Status Strip
+    st.markdown(f"**Active Filing:** `{doc_name}` &nbsp;•&nbsp; **Basis:** `{basis_label}` &nbsp;•&nbsp; **Currency Unit:** `{unit}`")
+
+    # Executive Summary Box
+    st.markdown("### 📌 AI Executive Narrative")
+    summary_text = data.get("summary") or ""
+    if not summary_text or "(AI summary comes in the next step)" in summary_text:
+        st.warning("AI Executive Summary pending. Upload a filing with the server API configured to generate.")
+    else:
+        st.markdown(f"<div class='summary-card'>{html.escape(summary_text)}</div>", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Workspace Tabs
+    tab1, tab2, tab3 = st.tabs([
+        "📊 Financial & Risk Analytics",
+        f"⚠️ Audit & Litigation Flags ({len(data.get('risk_flags') or [])})",
+        "💬 Ask the Filing (Grounded Q&A)"
+    ])
+
+    # TAB 1: ANALYTICS
+    with tab1:
+        def part(name):
+            d = metrics.get(name) or {}
+            return d.get("this_year"), d.get("last_year"), d.get("page")
+
+        inc_now, inc_before, inc_page = part("total_income")
+        prof_now, prof_before, prof_page = part("profit")
+        assets_now, assets_before, assets_page = part("total_assets")
+        equity_now, equity_before, equity_page = part("total_equity")
+
+        margin_now = metrics.get("profit_margin_pct")
+        margin_delta = difference(margin_now, ratio(prof_before, inc_before))
+        equity_ratio_now = metrics.get("equity_to_assets_pct")
+        equity_ratio_delta = difference(equity_ratio_now, ratio(equity_before, assets_before))
+
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            render_kpi_card(
+                "Total Income",
+                money(inc_now),
+                metrics.get("income_growth_pct"),
+                "% YoY",
+                f"📍 Source: Page {inc_page}" if inc_page else "Source: N/A"
+            )
+        with c2:
+            render_kpi_card(
+                "Net Profit",
+                money(prof_now),
+                metrics.get("profit_growth_pct"),
+                "% YoY",
+                f"📍 Source: Page {prof_page}" if prof_page else "Source: N/A"
+            )
+        with c3:
+            render_kpi_card(
+                "Net Profit Margin",
+                f"{margin_now}%" if margin_now is not None else "N/A",
+                margin_delta,
+                " pts YoY",
+                "📐 Net Profit / Total Income"
+            )
+        with c4:
+            render_kpi_card(
+                "Equity / Assets",
+                f"{equity_ratio_now}%" if equity_ratio_now is not None else "N/A",
+                equity_ratio_delta,
+                " pts YoY",
+                f"📍 Assets Page {assets_page}" if assets_page else "Balance Sheet Ratio"
+            )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Charts Row
+        col_bar, col_donut, col_gauge = st.columns([4, 3, 3])
+
+        with col_bar:
+            labels, before_vals, now_vals = [], [], []
+            for name, before, now in [
+                ("Income", inc_before, inc_now),
+                ("Net Profit", prof_before, prof_now),
+                ("Equity", equity_before, equity_now),
+            ]:
+                if before is not None and now is not None:
+                    labels.append(name)
+                    before_vals.append(before)
+                    now_vals.append(now)
+
+            if labels:
+                fig_bar = go.Figure(data=[
+                    go.Bar(name="Last Year", x=labels, y=before_vals, marker_color="#94a3b8", text=before_vals, texttemplate="%{text:,.0f}", textposition="outside"),
+                    go.Bar(name="This Year", x=labels, y=now_vals, marker_color="#2563eb", text=now_vals, texttemplate="%{text:,.0f}", textposition="outside"),
+                ])
+                fig_bar.update_layout(
+                    title="YoY Financial Trajectory",
+                    barmode="group",
+                    height=350,
+                    margin=dict(l=15, r=15, t=45, b=20),
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                )
+                st.plotly_chart(fig_bar, use_container_width=True)
+
+        with col_donut:
+            if assets_now and equity_now and assets_now >= equity_now:
+                liabilities_now = assets_now - equity_now
+                fig_donut = go.Figure(data=[go.Pie(
+                    labels=["Total Equity", "Total Liabilities"],
+                    values=[equity_now, liabilities_now],
+                    hole=0.58,
+                    marker=dict(colors=["#0ea5e9", "#cbd5e1"]),
+                    textinfo="percent"
+                )])
+                fig_donut.update_layout(
+                    title="Capital Structure Split",
+                    height=350,
+                    margin=dict(l=15, r=15, t=45, b=20),
+                    legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5),
+                )
+                st.plotly_chart(fig_donut, use_container_width=True)
+            else:
+                st.info("Capital structure split requires Total Assets & Equity.")
+
+        with col_gauge:
+            risk_score = data.get("risk_score", 0)
+            fig_gauge = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=risk_score,
+                number={"suffix": "/100", "font": {"size": 28}},
+                title={"text": "Audit Risk Index"},
+                gauge={
+                    "axis": {"range": [0, 100]},
+                    "bar": {"color": "#0f172a"},
+                    "steps": [
+                        {"range": [0, 35], "color": "#bbf7d0"},
+                        {"range": [35, 70], "color": "#fef08a"},
+                        {"range": [70, 100], "color": "#fecaca"},
+                    ],
+                    "threshold": {"line": {"color": "#dc2626", "width": 3}, "thickness": 0.75, "value": 70},
+                },
+            ))
+            fig_gauge.update_layout(height=350, margin=dict(l=25, r=25, t=45, b=20))
+            st.plotly_chart(fig_gauge, use_container_width=True)
+
+    # TAB 2: AUDIT RISKS
+    with tab2:
+        risk_flags = data.get("risk_flags") or []
+        if risk_flags:
+            sev_filter = st.radio("Filter by Severity:", ["All", "High", "Medium"], horizontal=True)
+            for idx, flag in enumerate(risk_flags, start=1):
+                sev = str(flag.get("severity", "medium")).capitalize()
+                if sev_filter != "All" and sev != sev_filter:
+                    continue
+
+                flag_type = str(flag.get("type", "general")).upper()
+                badge_sev = "badge-high" if sev.lower() == "high" else "badge-medium"
+
+                with st.expander(f"#{idx} | {flag_type} — {sev} Severity (Page {flag.get('page', 'N/A')})", expanded=(idx == 1)):
+                    st.markdown(
+                        f"<span class='badge-type'>{html.escape(flag_type)}</span> &nbsp; "
+                        f"<span class='{badge_sev}'>{html.escape(sev.upper())} RISK</span> &nbsp; "
+                        f"📍 **Filing Page:** `{flag.get('page', 'N/A')}`",
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        f"<div class='evidence-box'>{html.escape(str(flag.get('evidence', '')))}</div>",
+                        unsafe_allow_html=True,
+                    )
+        else:
+            st.success("✅ Clean Audit Screen: No severe litigation or penalty flags confirmed.")
+
+    # TAB 3: GROUNDED Q&A
+    with tab3:
+        st.caption("Ask questions about revenue, net profit, margins, balance sheet equity, or legal/tax risk disclosures.")
+        if "chat_history" not in st.session_state:
+            st.session_state.chat_history = [
+                {"role": "assistant", "content": f"Hello! I have loaded **{doc_name}**. Ask me any question about its financial performance or audit risk flags."}
+            ]
+
+        for msg in st.session_state.chat_history:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+        if user_q := st.chat_input("e.g., What is the YoY profit growth or what tax penalties were flagged?"):
+            st.session_state.chat_history.append({"role": "user", "content": user_q})
+            with st.chat_message("user"):
+                st.markdown(user_q)
+
+            reply = answer_question_from_report(user_q, data)
+            st.session_state.chat_history.append({"role": "assistant", "content": reply})
+            with st.chat_message("assistant"):
+                st.markdown(reply)
+
+elif uploaded_file is None:
+    st.error("No analysis data found. Ensure `ai_ml_layer/sample_output.json` is present or upload a PDF.")

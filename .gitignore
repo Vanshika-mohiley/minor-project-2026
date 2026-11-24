@@ -1,9 +1,11 @@
-__pycache__/
-*.py[cod]
-.env
-.venv/
 venv/
+__pycache__/
+*.pyc
+*.pdf
+.env
+ai_ml_layer/cache/
+venv/
+.venv/
 .pytest_cache/
 *.log
 .DS_Store
-ai_ml_layer/cache/
