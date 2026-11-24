@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://minor-project-2026.streamlit.app">Live Demo</a> ·
+  <a href="https://minor-project-2026-cwh7njkikl8oxhg2qqvnj7.streamlit.app/">Live Demo</a> ·
   <a href="https://github.com/Vanshika-mohiley/minor-project-2026/issues">Report a bug / request a feature</a>
 </p>
 
@@ -43,7 +43,7 @@ FinSight AI is an academic prototype for analysing corporate annual reports and 
 
 ## Live demo
 
-**[Open FinSight AI](https://minor-project-2026.streamlit.app)**
+**[Open FinSight AI](https://minor-project-2026-cwh7njkikl8oxhg2qqvnj7.streamlit.app/)**
 
 The dashboard does not load fabricated sample figures. Upload a PDF and choose a statement basis to analyse it. Do not upload confidential or sensitive documents to a public demo; use a local installation for private documents.
 
