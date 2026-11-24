@@ -1,3 +1,12 @@
-pydantic
-pymupdf
-plotly
+pydantic>=2.6
+pymupdf>=1.24
+plotly>=5.20
+streamlit>=1.35
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-multipart>=0.0.9
+ollama>=0.2
+pytesseract>=0.3.10
+Pillow>=10.0
+pytest>=8.0
+pandas>=2.1
